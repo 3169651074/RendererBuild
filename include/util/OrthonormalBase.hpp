@@ -37,6 +37,14 @@ namespace renderer {
             }
         }
 
+        //直接使用传入的正交向量（允许非单位向量）构造正交基
+        //cameraU --> x; v --> y; w --> z
+        OrthonormalBase(const Vec3 & x = Vec3(1.0, 0.0, 0.0), const Vec3 & y = Vec3(0.0, 1.0, 0.0), const Vec3 & z = Vec3(0.0, 0.0, 1.0)) {
+            elements[0] = x.unitVector();
+            elements[1] = y.unitVector();
+            elements[2] = z.unitVector();
+        }
+
         ~OrthonormalBase() = default;
 
         //将局部空间中的向量origin变换到世界空间
@@ -47,6 +55,14 @@ namespace renderer {
                 ret += elements[i] * origin[i];
             }
             return ret;
+        }
+
+        //将世界空间中的向量 worldVec 变换到此正交基定义的局部空间
+        Vec3 transformToLocal(const Vec3 & worldVec) const {
+            //局部坐标的分量等于世界向量在各个基向量上的投影，这个投影可以通过点积来计算
+            return Vec3(Vec3::dot(worldVec, elements[0]),
+                        Vec3::dot(worldVec, elements[1]),
+                        Vec3::dot(worldVec, elements[2]));
         }
 
         Vec3 operator[](size_t index) const { return elements[index]; }

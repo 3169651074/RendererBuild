@@ -14,7 +14,7 @@
 #include <pdf/MixturePDF.hpp>
 
 namespace renderer {
-    Uint32 render(const Camera & cam, SDL_Window * window, SDL_Surface * surface,
+    Uint32 render(Camera & cam, SDL_Window * window, SDL_Surface * surface,
                   const Rough * roughMaterials, const Metal * metalMaterials,
                   const DiffuseLight * lightMaterials, const Dielectric * dielectricMaterials,
                   const Sphere * spheres, Uint32 sphereCount,

@@ -66,7 +66,7 @@ int main(int argc, char * argv[]) {
 //    SDL_UpdateWindowSurface(window);
 //    SDL_Delay(1000 * 3);
 
-    const Camera cam(
+    Camera cam(
             WINDOW_WIDTH, WINDOW_HEIGHT,
             //Color3(.75, .75, .75),
             Color3(),

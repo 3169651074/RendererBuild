@@ -7,7 +7,7 @@ namespace renderer {
      * 像素渲染函数：根据每个像素的光线对象和场景物体列表进行光线计算
      * 物体数量信息包含在BVH树的节点中，求交函数通过判断叶子节点终止递归
      */
-    Color3 rayColor(const Color3 & background, const Ray & ray, Uint32 iterateDepth,
+    Color3 rayColor(Camera & cam, const Ray & ray, size_t sampleIndex,
                     const BVHTree::BVHTreeNode * tree, const std::pair<PrimitiveType, size_t> * indexArray,
                     const Sphere * spheres,
                     const Triangle * triangles,
@@ -23,7 +23,7 @@ namespace renderer {
         Ray currentRay(ray);
         Color3 result(1.0, 1.0, 1.0);
 
-        for (size_t currentIterateDepth = 0; currentIterateDepth < iterateDepth; currentIterateDepth++) {
+        for (size_t currentIterateDepth = 0; currentIterateDepth < cam.rayTraceDepth; currentIterateDepth++) {
             if (BVHTree::hit(tree, indexArray, spheres, triangles, parallelograms, transforms, boxes,
                              currentRay, Range(0.001, INFINITY), record)) {
                 Ray out;
@@ -69,6 +69,7 @@ namespace renderer {
                         const double cosTheta = roughMaterials[record.materialIndex].cosTheta(out, record);
                         result *= BRDFvalue * cosTheta / pdfValue;
 
+                        attenuation = BRDFvalue * PI;
                         currentRay = out;
                         break;
                     }
@@ -89,8 +90,15 @@ namespace renderer {
                     }
                     default:;
                 }
+
+                //记录降噪器信息
+                if (!cam.isRecordList[sampleIndex]) {
+                    cam.albedoList[sampleIndex] = attenuation;
+                    cam.normalList[sampleIndex] = cam.base.transformToLocal(record.normalVector);
+                    cam.isRecordList[sampleIndex] = true;
+                }
             } else {
-                result *= background; //没有发生碰撞，将背景光颜色作为光源乘入结果并结束追踪循环
+                result *= cam.backgroundColor; //没有发生碰撞，将背景光颜色作为光源乘入结果并结束追踪循环
                 break;
             }
         }
@@ -120,7 +128,7 @@ namespace renderer {
      * 需要传入场景信息：相机对象和物体列表，窗口信息
      *     以及输出信息：用于写入颜色数据的指针
      */
-    Uint32 render(const Camera & cam, SDL_Window * window, SDL_Surface * surface,
+    Uint32 render(Camera & cam, SDL_Window * window, SDL_Surface * surface,
                   const Rough * roughMaterials, const Metal * metalMaterials,
                   const DiffuseLight * lightMaterials, const Dielectric * dielectricMaterials,
                   const Sphere * spheres, Uint32 sphereCount,
@@ -166,6 +174,9 @@ namespace renderer {
                 }
 
                 Color3 result;
+                Color3 albedo;
+                Vec3 normal;
+                fill(cam.isRecordList.begin(), cam.isRecordList.end(), false);
 
                 //抗锯齿采样
 #define JITTERING
@@ -183,12 +194,11 @@ namespace renderer {
                                        roughMaterials, metalMaterials, lightMaterials);
                 }
 #else
-                const auto sqrtSampleCount = static_cast<size_t>(sqrt(cam.sampleCount));
-                const double reciprocalSqrtSampleCount = 1.0 / static_cast<double>(sqrtSampleCount);
-                for (size_t sampleI = 0; sampleI < sqrtSampleCount; sampleI++) {
-                    for (size_t sampleJ = 0; sampleJ < sqrtSampleCount; sampleJ++) {
-                        const double offsetX = ((sampleJ + randomDouble()) * reciprocalSqrtSampleCount) - 0.5;
-                        const double offsetY = ((sampleI + randomDouble()) * reciprocalSqrtSampleCount) - 0.5;
+
+                for (size_t sampleI = 0; sampleI < cam.sqrtSampleCount; sampleI++) {
+                    for (size_t sampleJ = 0; sampleJ < cam.sqrtSampleCount; sampleJ++) {
+                        const double offsetX = ((sampleJ + randomDouble()) * cam.reciprocalSqrtSampleCount) - 0.5;
+                        const double offsetY = ((sampleI + randomDouble()) * cam.reciprocalSqrtSampleCount) - 0.5;
                         const Point3 samplePoint =
                                 cam.pixelOrigin + ((j + offsetX) * cam.viewPortPixelDx) + ((i + offsetY) * cam.viewPortPixelDy);
 
@@ -196,18 +206,34 @@ namespace renderer {
                         const Ray ray = constructRay(cam, samplePoint);
 
                         //发射光线
-                        result += rayColor(cam.backgroundColor, ray, cam.rayTraceDepth, tree, indexArray,
+                        const size_t sampleIndex = sampleI * cam.sqrtSampleCount + sampleJ;
+                        result += rayColor(cam, ray, sampleIndex, tree, indexArray,
                                            spheres, triangles, parallelograms, transforms, boxes,
                                            roughMaterials, metalMaterials, lightMaterials, dielectricMaterials,
                                            hittablePDFSphere, hittablePDFSphereCount,
                                            hittablePDFParallelogram, hittablePDFParallelogramCount);
+
+                        //累加当前采样点的降噪数据
+                        albedo += cam.albedoList[sampleIndex];
+                        normal += cam.normalList[sampleIndex];
                     }
                 }
 #endif
-                result /= cam.sampleCount;
+                result *= cam.reciprocalSqrtSampleCount * cam.reciprocalSqrtSampleCount;
 
                 //写入颜色
                 result.writeColor(pixels + (i * cam.windowWidth + j), format);
+
+                //将降噪数据写入全局缓冲区
+                albedo *= cam.reciprocalSqrtSampleCount * cam.reciprocalSqrtSampleCount;
+                normal.unitize();
+
+                const size_t pixelIndex = (i * cam.windowWidth + j) * 3;
+                for (int k = 0; k < 3; k++) {
+                    cam.denoiser.colorPtr[pixelIndex + k] = static_cast<float>(result[k]);
+                    cam.denoiser.albedoPtr[pixelIndex + k] = static_cast<float>(albedo[k]);
+                    cam.denoiser.normalPtr[pixelIndex + k] = static_cast<float>(normal[k]);
+                }
             }
 
 #ifdef REFRESH_ON_RENDER
@@ -219,6 +245,9 @@ namespace renderer {
             }
 #endif
         }
+
+        //降噪并显示
+        cam.denoiser.denoiseAndWrite(pixels, format);
         return SDL_GetTicks() - startTick;
     }
 }
