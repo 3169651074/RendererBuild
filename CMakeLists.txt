@@ -9,14 +9,15 @@ set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
 
 if (WIN32)
     link_directories("${CMAKE_SOURCE_DIR}/lib")
+    set(OpenImageDenoise_DIR "${CMAKE_SOURCE_DIR}/lib/cmake/OpenImageDenoise-2.3.3")
 else ()
     find_package(SDL2 REQUIRED)
     find_package(SDL2_image REQUIRED)
 
     #-DOpenImageDenoise_DIR=/opt/intel/oneapi/oidn/2.2/lib/cmake/OpenImageDenoise
     #LD_LIBRARY_PATH=/opt/intel/oneapi/tbb/2021.12/env/../lib/intel64/gcc4.8:/opt/intel/oneapi/rkcommon/1.13/lib:/opt/intel/oneapi/ospray_studio/1.0/lib:/opt/intel/oneapi/ospray/3.1/lib:/opt/intel/oneapi/openvkl/2.0/lib:/opt/intel/oneapi/openpgl/0.6/lib:/opt/intel/oneapi/oidn/2.2/lib:/opt/intel/oneapi/mpi/2021.12/opt/mpi/libfabric/lib:/opt/intel/oneapi/mpi/2021.12/lib:/opt/intel/oneapi/ispc/1.23/lib:/opt/intel/oneapi/embree/4.3/lib:/opt/intel/oneapi/compiler/2024.1/opt/compiler/lib:/opt/intel/oneapi/compiler/2024.1/lib:/usr/local/cuda-12.9/lib64:
-    find_package(OpenImageDenoise REQUIRED)
 endif ()
+find_package(OpenImageDenoise REQUIRED)
 
 include_directories("${CMAKE_SOURCE_DIR}/include")
 
