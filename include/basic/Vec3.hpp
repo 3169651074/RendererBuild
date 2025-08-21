@@ -147,6 +147,34 @@ namespace renderer {
 
         // ====== 静态操作函数 ======
 
+        //生成遵守按指定轴余弦分布的随机向量，非单位向量
+        static inline Vec3 randomCosineVector(int axis, bool toPositive) {
+            double coord[3];
+            const auto r1 = randomDouble();
+            const auto r2 = randomDouble();
+
+            coord[0] = cos(2.0 * PI * r1) * 2.0 * sqrt(r2);
+            coord[1] = sin(2.0 * PI * r1) * 2.0 * sqrt(r2);
+            coord[2] = sqrt(1.0 - r2);
+
+            switch (axis) {
+                case 0:
+                    std::swap(coord[0], coord[2]);
+                    break;
+                case 1:
+                    std::swap(coord[1], coord[2]);
+                    break;
+                case 2:
+                default:
+                    break;
+            }
+
+            if (!toPositive) {
+                coord[axis] = -coord[axis];
+            }
+            return Vec3(coord[0], coord[1], coord[2]);
+        }
+
         //生成每个分量都在指定范围内的随机向量
         static inline Vec3 randomVector(double componentMin, double componentMax) {
             return Vec3(randomDouble(componentMin, componentMax), randomDouble(componentMin, componentMax), randomDouble(componentMin, componentMax));

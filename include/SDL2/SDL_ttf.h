@@ -2294,13 +2294,13 @@ extern DECLSPEC int SDLCALL TTF_SetFontDirection(TTF_Font *font, TTF_Direction d
  * Any value supplied here will override the global script set with the
  * deprecated TTF_SetScript().
  *
- * The supplied script value must be a null-terminated string of exactly four
+ * The supplied script value must be a nullptr-terminated string of exactly four
  * characters.
  *
  * If SDL_ttf was not built with HarfBuzz support, this function returns -1.
  *
  * \param font the font to specify a direction for.
- * \param script null-terminated string of exactly 4 characters.
+ * \param script nullptr-terminated string of exactly 4 characters.
  * \returns 0 on success, or -1 on error.
  *
  * \since This function is available since SDL_ttf 2.20.0.

@@ -3,6 +3,7 @@
 
 #include <basic/Ray.hpp>
 #include <util/Range.hpp>
+#include <util/Matrix.hpp>
 
 namespace renderer {
     /*
@@ -51,6 +52,36 @@ namespace renderer {
                 range[i] = Range(b1.range[i], b2.range[i]);
             }
             //合并不会减小包围盒的体积
+        }
+
+        //使用矩阵变换包围盒
+        BoundingBox transformBoundingBox(const Matrix & matrix) const {
+            //使用矩阵对包围盒的8个顶点进行变换
+            Point3 min(INFINITY, INFINITY, INFINITY);
+            Point3 max(-INFINITY, -INFINITY, -INFINITY);
+
+            for (int i = 0; i < 2; i++) {
+                for (int j = 0; j < 2; j++) {
+                    for (int k = 0; k < 2; k++) {
+                        //取出每个顶点的坐标
+                        const double x = i * range[0].max + (1.0 - i) * range[0].min;
+                        const double y = j * range[1].max + (1.0 - j) * range[1].min;
+                        const double z = k * range[2].max + (1.0 - k) * range[2].min;
+
+                        //计算变换后的坐标
+                        Point3 point(x, y, z);
+                        point = (matrix * Matrix::toMatrix(point.toVector(), 1.0)).toPoint();
+
+                        //计算最值，保证包围盒和坐标轴对齐
+                        for (int l = 0; l < 3; l++) {
+                            min[l] = std::min(min[l], point[l]);
+                            max[l] = std::max(max[l], point[l]);
+                        }
+                    }
+                }
+            }
+            //使用min和max重构包围盒
+            return {min, max};
         }
 
         bool hit(const Ray & ray, const Range & checkRange, double & t) const {

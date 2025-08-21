@@ -12,9 +12,6 @@ if (WIN32)
 else ()
     find_package(SDL2 REQUIRED)
     find_package(SDL2_image REQUIRED)
-    find_package(SDL2_mixer REQUIRED)
-    find_package(SDL2_ttf REQUIRED)
-    find_package(SDL2_net REQUIRED)
 endif ()
 
 include_directories("${CMAKE_SOURCE_DIR}/include")
@@ -30,6 +27,17 @@ add_executable(${EXECUTABLE_NAME}
         include/box/BVHTree.hpp
         include/material/Metal.hpp
         include/hittable/Triangle.hpp
+        include/hittable/Parallelogram.hpp
+        include/material/DiffuseLight.hpp
+        include/hittable/Transform.hpp
+        include/util/Matrix.hpp
+        src/util/Matrix.cpp
+        include/util/OrthonormalBase.hpp
+        include/pdf/CosinePDF.hpp
+        include/pdf/HittablePDF.hpp
+        include/pdf/MixturePDF.hpp
+        include/hittable/Box.hpp
+        include/material/Dielectric.hpp
 )
 
 if (WIN32)

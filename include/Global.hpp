@@ -14,10 +14,11 @@
 #include <random>
 #include <algorithm>
 #include <limits>
+#include <array>
+#include <stdexcept>
 
 #undef INFINITY
 #undef NULL
-#define null nullptr
 
 namespace renderer {
     // ====== 数值常量 ======
@@ -63,6 +64,8 @@ namespace renderer {
     inline bool floatValueEquals(const double v1, const double v2) {
         return std::abs(v1 - v2) < FLOAT_VALUE_ZERO_EPSILON;
     }
+
+#define arrayLengthOnPos(array) sizeof(array) / sizeof(array[0])
 
     //====== SDL包装函数 ======
 

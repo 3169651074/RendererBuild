@@ -219,7 +219,7 @@ SDL_CreateThread(SDL_ThreadFunction fn, const char *name, void *data);
  * see what happens with your system's debugger. The name should be UTF-8 (but
  * using the naming limits of C identifiers is a better bet). There are no
  * requirements for thread naming conventions, so long as the string is
- * null-terminated UTF-8, but these guidelines are helpful in choosing a name:
+ * nullptr-terminated UTF-8, but these guidelines are helpful in choosing a name:
  *
  * https://stackoverflow.com/questions/149932/naming-conventions-for-threads
  *

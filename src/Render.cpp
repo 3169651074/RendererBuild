@@ -1,5 +1,4 @@
 #include <Render.hpp>
-#include <box/BVHTree.hpp>
 
 using namespace std;
 
@@ -12,62 +11,88 @@ namespace renderer {
                     const BVHTree::BVHTreeNode * tree, const std::pair<PrimitiveType, size_t> * indexArray,
                     const Sphere * spheres,
                     const Triangle * triangles,
-                    const Rough * roughMaterials,
-                    const Metal * metalMaterials)
+                    const Parallelogram * parallelograms,
+                    const Transform * transforms,
+                    const Box * boxes,
+                    const Rough * roughMaterials, const Metal * metalMaterials,
+                    const DiffuseLight * lightMaterials, const Dielectric * dielectricMaterials,
+                    const Sphere * hittablePDFSphere, size_t hittablePDFSphereCount,
+                    const Parallelogram * hittablePDFParallelogram, size_t hittablePDFParallelogramCount)
     {
         HitRecord record;
         Ray currentRay(ray);
         Color3 result(1.0, 1.0, 1.0);
 
         for (size_t currentIterateDepth = 0; currentIterateDepth < iterateDepth; currentIterateDepth++) {
-            //每次追踪，都遍历所有球体，判断是否相交
-            if (BVHTree::hit(tree, indexArray, spheres, triangles, currentRay, Range(0.001, INFINITY), record)) {
-                //发生碰撞，调用材质的散射函数，获取下一次迭代的光线
+            if (BVHTree::hit(tree, indexArray, spheres, triangles, parallelograms, transforms, boxes,
+                             currentRay, Range(0.001, INFINITY), record)) {
                 Ray out;
                 Color3 attenuation;
 
-                //根据材质类型调用对应的散射函数
+                //光源
+                if (record.materialType == MaterialType::DIFFUSE_LIGHT) {
+                    //光源是光路的终点，需要综合之前的颜色，并结束光路
+                    return result * lightMaterials[record.materialIndex].emitted(currentRay, record);
+                }
+
+                //非光源，根据材质类型调用对应的散射函数
                 switch (record.materialType) {
-                    default:
-                    case MaterialType::ROUGH:
-                        roughMaterials[record.materialIndex].scatter(currentRay, record, attenuation, out);
-                        break;
-                    case MaterialType::METAL:
-                        metalMaterials[record.materialIndex].scatter(currentRay, record, attenuation, out);
-                        break;
-                }
+                    case MaterialType::ROUGH: {
+                        //CosinePDF用于材质表面采样
+                        const CosinePDF cosinePDF[] = {
+                                CosinePDF(record.normalVector)
+                        };
 
-                currentRay = out;
-                result *= attenuation; //光线衰减系数
+                        //将HittablePDF和CosinePDF组合进MixturePDF
+                        HittablePDF hittablePDF[32] {};
+                        size_t hittablePDFCount = 0;
+                        for (size_t i = 0; i < hittablePDFSphereCount; i++) {
+                            hittablePDF[hittablePDFCount++] = HittablePDF(PrimitiveType::SPHERE, i, record.hitPoint);
+                        }
+                        for (size_t i = 0; i < hittablePDFParallelogramCount; i++) {
+                            hittablePDF[hittablePDFCount++] = HittablePDF(PrimitiveType::PARALLELOGRAM, i, record.hitPoint);
+                        }
+
+                        const MixturePDF pdf(cosinePDF, hittablePDF,
+                                             1, hittablePDFSphereCount + hittablePDFParallelogramCount);
+
+                        //使用MixturePDF生成一个新的光线方向
+                        out = Ray(record.hitPoint, pdf.generate(hittablePDFSphere, hittablePDFParallelogram), ray.time);
+                        const double pdfValue = pdf.value(hittablePDFSphere, hittablePDFParallelogram, out.direction);
+
+                        //pdfValue有效性检查
+                        if (isnan(pdfValue) || isinf(pdfValue) || floatValueNearZero(pdfValue)) {
+                            return Color3(); //此处return result会使得画面严重偏白，PDF无效时，整条光路结果为黑色
+                        }
+
+                        const Color3 BRDFvalue = roughMaterials[record.materialIndex].evalBRDF(currentRay, record);
+                        const double cosTheta = roughMaterials[record.materialIndex].cosTheta(out, record);
+                        result *= BRDFvalue * cosTheta / pdfValue;
+
+                        currentRay = out;
+                        break;
+                    }
+                    case MaterialType::METAL: {
+                        if (metalMaterials[record.materialIndex].scatter(currentRay, record, attenuation, out)) {
+                            result *= attenuation;
+                            currentRay = out;
+                        } else {
+                            return result;
+                        }
+                        break;
+                    }
+                    case MaterialType::DIELECTRIC: {
+                        dielectricMaterials[record.materialIndex].scatter(currentRay, record, attenuation, out);
+                        result *= attenuation;
+                        currentRay = out;
+                        break;
+                    }
+                    default:;
+                }
             } else {
                 result *= background; //没有发生碰撞，将背景光颜色作为光源乘入结果并结束追踪循环
                 break;
             }
-
-            /*
-            auto closestIndex = (size_t)-1;
-            double closestT = INFINITY;
-            for (size_t i = 0; i < spheres.size(); i++) {
-                //取所有交点中最近的交点作为实际发生光线相交的球体
-                if (spheres[i].hit(currentRay, Range(0.001, closestT), record)) {
-                    closestT = record.t;
-                    closestIndex = i;
-                }
-            }
-
-            if (closestIndex != (size_t)-1) {
-                //发生碰撞，调用材质的散射函数，获取下一次迭代的光线
-                Ray out;
-                Color3 attenuation;
-                roughMaterials[spheres[closestIndex].materialIndex].scatter(currentRay, record, attenuation, out);
-
-                currentRay = out;
-                result *= attenuation; //光线衰减系数
-            } else {
-                result *= background; //没有发生碰撞，将背景光颜色作为光源乘入结果并结束追踪循环
-                break;
-            }
-             */
         }
         return result;
     }
@@ -75,12 +100,7 @@ namespace renderer {
     /*
      * 光线构造函数：根据相机对象和线程下标构造光线
      */
-    Ray constructRay(const Camera & cam, Uint32 threadX, Uint32 threadY) {
-        //当前像素对应位置
-        const Point3 samplePoint =
-                cam.pixelOrigin + (threadY + randomDouble(-cam.sampleRange, cam.sampleRange)) * cam.viewPortPixelDy
-                + (threadX + randomDouble(-cam.sampleRange, cam.sampleRange)) * cam.viewPortPixelDx;
-
+    Ray constructRay(const Camera & cam, const Point3 & samplePoint) {
         //离焦采样：在离焦半径内随机选取一个点，以这个点发射光线
         Point3 rayOrigin = cam.cameraCenter;
         if (cam.focusDiskRadius > 0.0) {
@@ -100,41 +120,104 @@ namespace renderer {
      * 需要传入场景信息：相机对象和物体列表，窗口信息
      *     以及输出信息：用于写入颜色数据的指针
      */
-    Uint32 render(const Camera & cam, Uint32 * pixels, const SDL_PixelFormat * format,
-                  const Rough * roughMaterials,
-                  const Metal * metalMaterials,
+    Uint32 render(const Camera & cam, SDL_Window * window, SDL_Surface * surface,
+                  const Rough * roughMaterials, const Metal * metalMaterials,
+                  const DiffuseLight * lightMaterials, const Dielectric * dielectricMaterials,
                   const Sphere * spheres, Uint32 sphereCount,
-                  const Triangle * triangles, Uint32 triangleCount)
+                  const Triangle * triangles, Uint32 triangleCount,
+                  const Parallelogram * parallelograms, Uint32 parallelogramCount,
+                  const Transform * transforms, Uint32 transformCount,
+                  const Box * boxes, Uint32 boxCount,
+                  const Sphere * hittablePDFSphere, size_t hittablePDFSphereCount,
+                  const Parallelogram * hittablePDFParallelogram, size_t hittablePDFParallelogramCount)
     {
+
+        auto pixels = static_cast<Uint32 *>(surface->pixels);
+        auto format = surface->format;
+
         //构建BVH
         auto sphereVector = vector<Sphere>(spheres, spheres + sphereCount);
         auto triangleVector = vector<Triangle>(triangles, triangles + triangleCount);
+        auto parallelogramVector = vector<Parallelogram>(parallelograms, parallelograms + parallelogramCount);
+        auto transformVector = vector<Transform>(transforms, transforms + transformCount);
+        auto boxVector = vector<Box>(boxes, boxes + boxCount);
 
         //先利用vector的返回值传递接收数组，再转换为指针
-        const auto ret = BVHTree::constructBVHTree(sphereVector, triangleVector);
+        //在此处构造包含所有物体的HittableList的BVH
+        const auto ret = BVHTree::constructBVHTree(sphereVector, triangleVector, parallelogramVector, transformVector, boxVector);
+
         //获取原始指针，用于在GPU函数间传递
         const BVHTree::BVHTreeNode * tree = ret.first.data();
         const std::pair<PrimitiveType, size_t> * indexArray = ret.second.data();
 
-        //分配线程，GPU线程执行
+#define REFRESH_ON_RENDER
+#ifdef REFRESH_ON_RENDER
+        const Uint32 refreshRate = 1;
+        Uint32 lastRate = 0;
+#endif
+
+        //分配线程，由GPU线程执行主渲染逻辑
         const Uint32 startTick = SDL_GetTicks();
         for (Uint32 i = 0; i < cam.windowHeight; i++) {
             for (Uint32 j = 0; j < cam.windowWidth; j++) {
+                SDL_Event event;
+                while (SDL_PollEvent(&event)) {
+                    if (event.type == SDL_QUIT) { exit(1); }
+                }
+
                 Color3 result;
 
                 //抗锯齿采样
+#define JITTERING
+#ifndef JITTERING
                 for (size_t k = 0; k < cam.sampleCount; k++) {
                     //构造光线
-                    const Ray ray = constructRay(cam, j, i);
+                    const Point3 samplePoint =
+                            cam.pixelOrigin + (i + randomDouble(-cam.sampleRange, cam.sampleRange)) * cam.viewPortPixelDy
+                            + (j + randomDouble(-cam.sampleRange, cam.sampleRange)) * cam.viewPortPixelDx;
+                    const Ray ray = constructRay(cam, samplePoint);
 
                     //进行像素独立的计算
-                    result += rayColor(cam.backgroundColor, ray, cam.rayTraceDepth, tree, indexArray, spheres, triangles, roughMaterials, metalMaterials);
+                    result += rayColor(cam.backgroundColor, ray, cam.rayTraceDepth, tree, indexArray,
+                                       spheres, triangles, parallelograms, transforms,
+                                       roughMaterials, metalMaterials, lightMaterials);
                 }
+#else
+                const auto sqrtSampleCount = static_cast<size_t>(sqrt(cam.sampleCount));
+                const double reciprocalSqrtSampleCount = 1.0 / static_cast<double>(sqrtSampleCount);
+                for (size_t sampleI = 0; sampleI < sqrtSampleCount; sampleI++) {
+                    for (size_t sampleJ = 0; sampleJ < sqrtSampleCount; sampleJ++) {
+                        const double offsetX = ((sampleJ + randomDouble()) * reciprocalSqrtSampleCount) - 0.5;
+                        const double offsetY = ((sampleI + randomDouble()) * reciprocalSqrtSampleCount) - 0.5;
+                        const Point3 samplePoint =
+                                cam.pixelOrigin + ((j + offsetX) * cam.viewPortPixelDx) + ((i + offsetY) * cam.viewPortPixelDy);
+
+                        //构造光线
+                        const Ray ray = constructRay(cam, samplePoint);
+
+                        //发射光线
+                        result += rayColor(cam.backgroundColor, ray, cam.rayTraceDepth, tree, indexArray,
+                                           spheres, triangles, parallelograms, transforms, boxes,
+                                           roughMaterials, metalMaterials, lightMaterials, dielectricMaterials,
+                                           hittablePDFSphere, hittablePDFSphereCount,
+                                           hittablePDFParallelogram, hittablePDFParallelogramCount);
+                    }
+                }
+#endif
                 result /= cam.sampleCount;
 
                 //写入颜色
                 result.writeColor(pixels + (i * cam.windowWidth + j), format);
             }
+
+#ifdef REFRESH_ON_RENDER
+            const auto rate = static_cast<Uint32>(i * 100 / cam.windowHeight);
+            if (rate / refreshRate != lastRate) {
+                lastRate = rate / refreshRate;
+                SDL_Log("Rendered %u%%", rate);
+                SDL_UpdateWindowSurface(window);
+            }
+#endif
         }
         return SDL_GetTicks() - startTick;
     }

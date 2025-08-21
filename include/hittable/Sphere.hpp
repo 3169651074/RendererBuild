@@ -2,6 +2,7 @@
 #define RENDERERTEST_SPHERE_HPP
 
 #include <box/BoundingBox.hpp>
+#include <util/OrthonormalBase.hpp>
 
 namespace renderer {
     /*
@@ -93,6 +94,36 @@ namespace renderer {
             const Vec3 localVector = Point3::constructVector(currentCenter, record.hitPoint).unitVector();
             record.uvPair = mapUVPair(Point3(localVector));
             return true;
+        }
+
+        Vec3 randomVector(const Point3 &origin) const {
+            //此计算方法只对静止球体有效
+            const Vec3 direction = Point3::constructVector(origin, center.at(0.0));
+            const double distanceSquare = direction.lengthSquare();
+
+            const double r1 = randomDouble();
+            const double r2 = randomDouble();
+
+            const double phi = 2.0 * PI * r1;
+            const double z = 1.0 + r2 * (std::sqrt(1.0 - radius * radius / distanceSquare) - 1);
+            const double x = std::cos(phi) * std::sqrt(1.0 - z * z);
+            const double y = std::sin(phi) * std::sqrt(1.0 - z * z);
+
+            OrthonormalBase base(direction, 2);
+            return base.transform(Vec3(x, y, z));
+        }
+
+        double pdfValue(const Point3 &origin, const Vec3 &direction) const {
+            //此计算方法只对静止球体有效
+            HitRecord record;
+            if (!this->hit(Ray(origin, direction), Range(0.001, INFINITY), record)) {
+                return 0.0;
+            }
+
+            const double distanceSquare = Point3::distanceSquare(origin, center.at(0.0));
+            const double cosThetaMax = std::sqrt(1.0 - radius * radius / distanceSquare);
+            const double solidAngle = 2.0 * PI * (1.0 - cosThetaMax);
+            return 1.0 / solidAngle;
         }
     };
 }

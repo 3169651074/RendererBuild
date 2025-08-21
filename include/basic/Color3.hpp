@@ -92,6 +92,14 @@ namespace renderer {
             Color3 ret(*this); ret /= obj; return ret;
         }
 
+        friend Color3 operator*(double num, const Color3 & obj) {
+            return obj * num;
+        }
+
+        friend Color3 operator/(double num, const Color3 & obj) {
+            return obj / num;
+        }
+
         //颜色写入函数
         void writeColor(Uint32 * pixelPointer, const SDL_PixelFormat * format, double gamma = 2.0) const {
             //进行伽马校正

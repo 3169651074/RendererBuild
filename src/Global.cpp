@@ -3,12 +3,12 @@
 using namespace renderer;
 
 namespace renderer {
-    void (*func)() = null;
+    void (*func)() = nullptr;
 }
 
 namespace {
     void checkInitError(const char * taskName, TaskOnError task, bool isError) { //枚举类型为int，传值
-        if (func == null) {
+        if (func == nullptr) {
             SDL_Log("Release resources function is not set!");
         }
 
@@ -19,7 +19,7 @@ namespace {
                     break;
                 case EXIT_PROGRAM:
                     SDL_Log("%s Failed, Exit Program: %s\n", taskName, SDL_GetError());
-                    if (func != null) {
+                    if (func != nullptr) {
                         func();
                     }
                     exit(EXIT_FAILURE);
@@ -41,6 +41,6 @@ namespace renderer {
     }
 
     void sdlCheckErrorPtr(void * retVal, const char * taskName, TaskOnError errorTask) {
-        checkInitError(taskName, errorTask, retVal == null);
+        checkInitError(taskName, errorTask, retVal == nullptr);
     }
 }

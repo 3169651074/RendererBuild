@@ -1,7 +1,7 @@
 #ifndef RENDERERBUILD_BVHTREE_HPP
 #define RENDERERBUILD_BVHTREE_HPP
 
-#include <box/BoundingBox.hpp>
+#include <hittable/Transform.hpp>
 
 namespace renderer {
     class BVHTree {
@@ -11,15 +11,6 @@ namespace renderer {
         struct BVHTreeNode {
             //当前节点的包围盒
             BoundingBox boundingBox;
-
-//            //节点类型标记
-//            bool isLeaf = false;
-//
-//            //节点信息
-//            size_t leftChildID = (size_t)-1; //中间节点：左子节点索引（右子节点 = 左子节点 + 1）
-//
-//            PrimitiveType primitiveType {};  //叶子节点：图元类型
-//            size_t primitiveID = (size_t)-1; //叶子节点：图元在对应数组中的索引
 
             /*
              * 一个叶子节点可以包含多个图元：如果primitiveCount大于0，则为叶子节点
@@ -69,25 +60,65 @@ namespace renderer {
          * 构建方式为迭代式构建，广度优先。经典递归式构建为深度优先
          * 由CPU执行
          */
-        static std::pair<std::vector<BVHTreeNode>, std::vector<std::pair<PrimitiveType, size_t>>>
-                constructBVHTree(const std::vector<Sphere> & spheres, const std::vector<Triangle> & triangles) {
+        static std::pair<std::vector<BVHTreeNode>, std::vector<std::pair<PrimitiveType, size_t>>> constructBVHTree(
+                const std::vector<Sphere> & spheres,
+                const std::vector<Triangle> & triangles,
+                const std::vector<Parallelogram> & parallelograms,
+                const std::vector<Transform> & transforms,
+                const std::vector<Box> & boxes)
+        {
             //构造统一数据列表
-            std::vector<PrimitiveInfo> primitiveArray(spheres.size() + triangles.size(), PrimitiveInfo());
+            std::vector<PrimitiveInfo> spherePrimitiveArray(spheres.size(), PrimitiveInfo());
             for (size_t i = 0; i < spheres.size(); i++) {
-                auto & element = primitiveArray[i];
+                auto & element = spherePrimitiveArray[i];
                 element.boundingBox = spheres[i].constructBoundingBox(); //预存储包围盒，不用在构造整体包围盒时重复计算图元包围盒
                 element.centroid = spheres[i].center.origin;
                 element.type = PrimitiveType::SPHERE;
                 element.index = i;
             }
 
+            std::vector<PrimitiveInfo> trianglePrimitiveArray(triangles.size(), PrimitiveInfo());
             for (size_t i = 0; i < triangles.size(); i++) {
-                auto & element = primitiveArray[spheres.size() + i];
+                auto & element = trianglePrimitiveArray[i];
                 element.boundingBox = triangles[i].constructBoundingBox();
                 element.centroid = triangles[i].centroid();
                 element.type = PrimitiveType::TRIANGLE;
                 element.index = i;
             }
+
+            std::vector<PrimitiveInfo> parallelogramPrimitiveArray(parallelograms.size(), PrimitiveInfo());
+            for (size_t i = 0; i < parallelograms.size(); i++) {
+                auto & element = parallelogramPrimitiveArray[i];
+                element.boundingBox = parallelograms[i].constructBoundingBox();
+                element.centroid = parallelograms[i].centroid();
+                element.type = PrimitiveType::PARALLELOGRAM;
+                element.index = i;
+            }
+
+            std::vector<PrimitiveInfo> transformPrimitiveArray(transforms.size(), PrimitiveInfo());
+            for (size_t i = 0; i < transforms.size(); i++) {
+                auto & element = transformPrimitiveArray[i];
+                element.boundingBox = transforms[i].transformedBoundingBox;
+                element.centroid = transforms[i].transformedCentroid;
+                element.type = PrimitiveType::TRANSFORM;
+                element.index = i;
+            }
+
+            std::vector<PrimitiveInfo> boxPrimitiveArray(boxes.size(), PrimitiveInfo());
+            for (size_t i = 0; i < boxes.size(); i++) {
+                auto & element = boxPrimitiveArray[i];
+                element.boundingBox = boxes[i].constructBoundingBox();
+                element.centroid = boxes[i].centroid();
+                element.type = PrimitiveType::BOX;
+                element.index = i;
+            }
+
+            std::vector<PrimitiveInfo> primitiveArray;
+            primitiveArray.insert(primitiveArray.end(), spherePrimitiveArray.begin(), spherePrimitiveArray.end());
+            primitiveArray.insert(primitiveArray.end(), trianglePrimitiveArray.begin(), trianglePrimitiveArray.end());
+            primitiveArray.insert(primitiveArray.end(), parallelogramPrimitiveArray.begin(), parallelogramPrimitiveArray.end());
+            primitiveArray.insert(primitiveArray.end(), transformPrimitiveArray.begin(), transformPrimitiveArray.end());
+            primitiveArray.insert(primitiveArray.end(), boxPrimitiveArray.begin(), boxPrimitiveArray.end());
 
             //分配存储空间，有N个叶子节点的二叉树共有2N-1个节点
             std::vector<BVHTreeNode> ret(2 * primitiveArray.size() - 1, BVHTreeNode());
@@ -112,12 +143,6 @@ namespace renderer {
                 auto & node = ret[task.nodeIndex];
                 if (task.primitiveCount <= PRIMITIVE_COUNT_PER_LEAF_NODE) {
                     //叶子节点
-//                    const auto & primitive = primitiveArray[task.primitiveStartIndex];
-//                    element.boundingBox = primitive.boundingBox;
-//                    element.primitiveID = primitive.index;
-//                    element.primitiveType = primitive.type;
-//                    element.isLeaf = true;
-
                     //将当前task的所有图元添加到叶子节点中
                     node.primitiveCount = task.primitiveCount;
                     node.index = primitiveIndexArray.size();
@@ -200,6 +225,9 @@ namespace renderer {
         static bool hit(const BVHTreeNode * tree, const std::pair<PrimitiveType, size_t> * indexArray,
                         const Sphere * spheres,
                         const Triangle * triangles,
+                        const Parallelogram * parallelograms,
+                        const Transform * transforms,
+                        const Box * boxes,
                         const Ray & ray, const Range & range, HitRecord & record)
         {
             //return traverse(nodeArray, primitives, ray, range, record, 0);
@@ -239,6 +267,28 @@ namespace renderer {
                                 break;
                             case PrimitiveType::TRIANGLE:
                                 if (triangles[pair.second].hit(ray, currentRange, tempRecord)) {
+                                    isHit = true;
+                                    currentRange.max = tempRecord.t;
+                                    record = tempRecord;
+                                }
+                                break;
+                            case PrimitiveType::PARALLELOGRAM:
+                                if (parallelograms[pair.second].hit(ray, currentRange, tempRecord)) {
+                                    isHit = true;
+                                    currentRange.max = tempRecord.t;
+                                    record = tempRecord;
+                                }
+                                break;
+                            case PrimitiveType::TRANSFORM:
+                                //Transform::hit函数需要所有类型的图元列表
+                                if (transforms[pair.second].hit(ray, currentRange, tempRecord)) {
+                                    isHit = true;
+                                    currentRange.max = tempRecord.t;
+                                    record = tempRecord;
+                                }
+                                break;
+                            case PrimitiveType::BOX:
+                                if (boxes[pair.second].hit(ray, currentRange, tempRecord)) {
                                     isHit = true;
                                     currentRange.max = tempRecord.t;
                                     record = tempRecord;

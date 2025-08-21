@@ -330,7 +330,7 @@ Sint32 SDLTest_RandomIntegerInRange(Sint32 min, Sint32 max);
 
 
 /**
- * Generates random null-terminated string. The minimum length for
+ * Generates random nullptr-terminated string. The minimum length for
  * the string is 1 character, maximum length for the string is 255
  * characters and it can contain ASCII characters from 32 to 126.
  *
@@ -342,7 +342,7 @@ char * SDLTest_RandomAsciiString(void);
 
 
 /**
- * Generates random null-terminated string. The maximum length for
+ * Generates random nullptr-terminated string. The maximum length for
  * the string is defined by the maxLength parameter.
  * String can contain ASCII characters from 32 to 126.
  *
@@ -356,7 +356,7 @@ char * SDLTest_RandomAsciiStringWithMaximumLength(int maxLength);
 
 
 /**
- * Generates random null-terminated string. The length for
+ * Generates random nullptr-terminated string. The length for
  * the string is defined by the size parameter.
  * String can contain ASCII characters from 32 to 126.
  *

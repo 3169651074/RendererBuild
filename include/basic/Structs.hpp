@@ -6,12 +6,17 @@
 namespace renderer {
     //图元类型枚举
     enum class PrimitiveType {
-        SPHERE, TRIANGLE
+        SPHERE, TRIANGLE, PARALLELOGRAM, TRANSFORM, BOX
     };
 
     //材质类型枚举
     enum class MaterialType {
-        ROUGH, METAL
+        ROUGH, METAL, DIFFUSE_LIGHT, DIELECTRIC
+    };
+
+    //PDF类型枚举
+    enum class PDFType {
+        COSINE, HITTABLE, MIXTURE
     };
 
     //碰撞信息

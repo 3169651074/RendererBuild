@@ -1939,7 +1939,7 @@ extern DECLSPEC SDL_Surface * SDLCALL IMG_LoadSizedSVG_RW(SDL_RWops *src, int wi
  * When done with the returned surface, the app should dispose of it with a
  * call to SDL_FreeSurface().
  *
- * \param xpm a null-terminated array of strings that comprise XPM data.
+ * \param xpm a nullptr-terminated array of strings that comprise XPM data.
  * \returns a new SDL surface, or NULL on error.
  *
  * \since This function is available since SDL_image 2.0.0.
@@ -1958,7 +1958,7 @@ extern DECLSPEC SDL_Surface * SDLCALL IMG_ReadXPMFromArray(char **xpm);
  * When done with the returned surface, the app should dispose of it with a
  * call to SDL_FreeSurface().
  *
- * \param xpm a null-terminated array of strings that comprise XPM data.
+ * \param xpm a nullptr-terminated array of strings that comprise XPM data.
  * \returns a new SDL surface, or NULL on error.
  *
  * \since This function is available since SDL_image 2.6.0.

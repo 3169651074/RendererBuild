@@ -2,6 +2,7 @@
 #define RAY_HPP
 
 #include <basic/Point3.hpp>
+#include <basic/Color3.hpp>
 #include <basic/Structs.hpp>
 
 namespace renderer {

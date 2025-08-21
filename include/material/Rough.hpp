@@ -15,20 +15,42 @@ namespace renderer {
     public:
         explicit Rough(const Color3 & albedo) : albedo(albedo) {}
 
-        //粗糙材质：漫反射
-        bool scatter(const Ray & in, const HitRecord & record, Color3 & attenuation, Ray & out) const {
-            //随机选择一个反射方向
-            Vec3 reflectDirection = (record.normalVector + Vec3::randomSpaceVector(1.0)).unitVector();
+        /*
+         * 粗糙材质：漫反射
+         * 此材质的BRDF为rho / π，rho为材质的albedo，则BRDF为一个常数
+         * 渲染方程中的余弦项为法向量和出射方向向量的夹角
+         */
+//        bool scatter(const Ray & in, const HitRecord & record, Color3 & attenuation, Ray & out) const {
+//            //使用正交基，以record.normalVector作为z轴
+//            //遵守余弦概率密度
+//            const OrthonormalBase base(record.normalVector, 2);
+//            Vec3 randomVec = Vec3::randomCosineVector(2, true);
+//
+//            //将randomVec从局部坐标系转换到世界坐标系，randomVec为随机选择的反射方向
+//            randomVec = base.transform(randomVec);
+//
+//            //从反射点出发构造反射光线
+//            out = Ray(record.hitPoint, randomVec.unitVector(), in.time);
+//            attenuation = albedo;
+//            return true;
+//        }
+//
+//        double scatterPDF(const Ray & in, const HitRecord & record, const Ray & out) const {
+//            return std::max(0.0, Vec3::dot(record.normalVector, out.direction.unitVector()) / PI);
+//        }
 
-            //随机的反射方向可能和法向量相互抵消，此时取消随机反射
-            if (floatValueEquals(reflectDirection.lengthSquare(), Vec3::VECTOR_LENGTH_SQUARE_ZERO_EPSILON)) {
-                reflectDirection = record.normalVector;
-            }
+        /*
+         * BRDF是一个函数，它能根据入射光线的方向，摄像机的方向和法线方向计算出特定方向上的反射光强度
+         * Bidirectional Reflectance Distribution Function
+         */
+        Color3 evalBRDF(const Ray & in, const HitRecord & record) const {
+            return albedo / PI;
+        }
 
-            //从反射点出发构造反射光线
-            out = Ray(record.hitPoint, reflectDirection, in.time);
-            attenuation = albedo;
-            return true;
+        //计算渲染方程中的余弦项
+        double cosTheta(const Ray & out, const HitRecord & record) const {
+            return std::max(0.0, Vec3::dot(record.normalVector, out.direction.unitVector()));
+            //return Vec3::dot(record.normalVector, out.direction.unitVector());
         }
     };
 }

@@ -549,7 +549,7 @@ extern DECLSPEC int SDLCALL SDL_RWclose(SDL_RWops *context);
 /**
  * Load all the data from an SDL data stream.
  *
- * The data is allocated with a zero byte at the end (null terminated) for
+ * The data is allocated with a zero byte at the end (nullptr terminated) for
  * convenience. This extra byte is not included in the value reported via
  * `datasize`.
  *
@@ -569,7 +569,7 @@ extern DECLSPEC void *SDLCALL SDL_LoadFile_RW(SDL_RWops *src,
 /**
  * Load all the data from a file path.
  *
- * The data is allocated with a zero byte at the end (null terminated) for
+ * The data is allocated with a zero byte at the end (nullptr terminated) for
  * convenience. This extra byte is not included in the value reported via
  * `datasize`.
  *
