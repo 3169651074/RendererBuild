@@ -12,9 +12,9 @@
 克隆仓库后直接使用CMake编译即可
 
 ### Ubuntu/Debian
-1. 使用系统包管理器安装SDL2依赖库
+1. 使用系统包管理器安装SDL2依赖库和GCC
 ```
-sudo apt update && sudo apt install libsdl2-dev libsdl2-image-dev
+sudo apt update && sudo apt install libsdl2-dev libsdl2-image-dev gcc g++
 ```
 2. 使用oneapi安装Intel OIDN降噪器  
 安装必要工具

@@ -280,7 +280,6 @@ namespace renderer {
                                 }
                                 break;
                             case PrimitiveType::TRANSFORM:
-                                //Transform::hit函数需要所有类型的图元列表
                                 if (transforms[pair.second].hit(ray, currentRange, tempRecord)) {
                                     isHit = true;
                                     currentRange.max = tempRecord.t;

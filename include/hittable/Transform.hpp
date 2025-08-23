@@ -27,7 +27,7 @@ namespace renderer {
         BoundingBox transformedBoundingBox;
         Point3 transformedCentroid;
 
-        Transform(const void * primitiveArray, PrimitiveType primitiveType, size_t primitiveIndex, BoundingBox boundingBox, Point3 centroid,
+        Transform(const void * primitiveArray, PrimitiveType primitiveType, size_t primitiveIndex, const BoundingBox& boundingBox, const Point3& centroid,
                   const std::array<double, 3> & rotate = {}, const std::array<double, 3> & shift = {}, const std::array<double, 3> & scale = {1.0, 1.0, 1.0}) :
                   primitiveArray(primitiveArray), primitiveType(primitiveType), primitiveIndex(primitiveIndex), transformMatrix(4, 4), transformInverse(4, 4), transformInverseTranspose(4, 4)
         {
